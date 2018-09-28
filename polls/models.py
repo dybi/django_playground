@@ -3,6 +3,8 @@ import datetime
 from django.db import models
 from django.utils import timezone
 
+from .constants import ONE_DAY
+
 
 class Question(models.Model):
     question_text = models.CharField(max_length=200)
@@ -13,7 +15,7 @@ class Question(models.Model):
 
     def was_published_recently(self):
         now = timezone.now()
-        return now - datetime.timedelta(days=1) <= self.pub_date <= now
+        return now - datetime.timedelta(days=ONE_DAY) <= self.pub_date <= now
 
 
 class Choice(models.Model):
