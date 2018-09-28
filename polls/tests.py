@@ -47,14 +47,17 @@ class QuestionModelTests(TestCase):
         self.assertTrue(recent_question.was_published_recently())
 
 
-def create_question(question_text, days):
+def create_question(question_text, days, should_add_choice=True):
     """
     Create a question with the given `question_text` and published the
     given number of `days` offset to now (negative for questions published
     in the past, positive for questions that have yet to be published).
     """
     time = timezone.now() + datetime.timedelta(days=days)
-    return Question.objects.create(question_text=question_text, pub_date=time)
+    question = Question.objects.create(question_text=question_text, pub_date=time)
+    if should_add_choice:
+        question.choice_set.create(choice_text="The only answer", votes=0)
+    return question
 
 
 class QuestionIndexViewTests(TestCase):
@@ -114,6 +117,16 @@ class QuestionIndexViewTests(TestCase):
             ['<Question: Past question 2.>', '<Question: Past question 1.>']
         )
 
+    def test_that_only_questions_with_choices_are_displayed(self):
+        create_question(question_text="First added", days=-3)
+        create_question(question_text="Second added", days=-2)
+        create_question(question_text="No choice", days=-2, should_add_choice=False)
+        response =self.client.get(reverse('polls:index'))
+        self.assertQuerysetEqual(
+            response.context['latest_question_list'],
+            ['<Question: Second added>', '<Question: First added>']
+         )
+
 
 class QuestionDetailViewTests(TestCase):
     def test_future_question(self):
@@ -136,6 +149,12 @@ class QuestionDetailViewTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, past_question.question_text)
 
+    def test_that_questions_without_choices_are_not_displayed(self):
+        question_without_choice = create_question(question_text="No choice", days=-2, should_add_choice=False)
+        url = reverse('polls:detail', args=(question_without_choice.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
 
 class QuestionResultsViewTests(TestCase):
     def test_future_question(self):
@@ -157,3 +176,9 @@ class QuestionResultsViewTests(TestCase):
         url = reverse('polls:results', args=(past_question.id,))
         response = self.client.get(url)
         self.assertContains(response, past_question.question_text)
+
+    def test_that_questions_without_choices_are_not_displayed(self):
+        question_without_choice = create_question(question_text="No choice", days=-2, should_add_choice=False)
+        url = reverse('polls:results', args=(question_without_choice.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
