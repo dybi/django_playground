@@ -1,5 +1,4 @@
 import datetime
-
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -182,3 +181,33 @@ class QuestionResultsViewTests(TestCase):
         url = reverse('polls:results', args=(question_without_choice.id,))
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+class TestVoting(TestCase):
+    def test_that_in_question_doesnt_exist_404_is_returned(self):
+        non_existing_question_id = 777
+        url = reverse('polls:vote', args=(non_existing_question_id,))
+        response = self.client.post(
+            url,
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_that_when_no_choice_is_made_vote_returns_to_question_details_view(self):
+        question = create_question(question_text='Past Question.', days=-5)
+        url = reverse('polls:vote', args=(question.id, ))
+        response = self.client.post(
+            url,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, question.question_text)
+
+    def test_that_when_choice_is_made_vote_redirects_to_results_view(self):
+        question = create_question(question_text='Past Question.', days=-5)
+        choice = question.choice_set.create(choice_text="second choice", votes=0)
+        url = reverse('polls:vote', args=(question.id, ))
+        response = self.client.post(
+            url,
+            data={'choice': (choice.id)}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('polls:results', args=(question.id,)))
